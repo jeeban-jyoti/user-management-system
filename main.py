@@ -1,3 +1,4 @@
+# Importing the required modules
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
@@ -8,28 +9,20 @@ from pydantic import BaseModel
 
 # Initialize Firebase Admin SDK
 options = {
-    'serviceAccountId': 'firebase-adminsdk-6bqbs@user-management-system-994a9.iam.gserviceaccount.com',
+    'serviceAccountId': 'example.iam.gserviceaccount.com',
 }
-cred = credentials.Certificate('user-management-system-994a9-firebase-adminsdk-6bqbs-36f6846d26.json')
+cred = credentials.Certificate('/path/service-account-key.json')
 firebase_admin.initialize_app(cred, options=options)
-
-action_code_settings = auth.ActionCodeSettings(
-    url='http://0.0.0.0:8000/signin',
-    handle_code_in_app=True,
-    ios_bundle_id='com.example.ios',
-    android_package_name='com.example.android',
-    android_install_app=True,
-    android_minimum_version='12',
-    dynamic_link_domain='coolapp.page.link',
-)
 
 db = firestore.client()
 
+# Initialising the fast api app
 app = FastAPI(
     title='Fastapi Docs',
     docs_url='/'
 )
 
+# Creating the templates for json objects on API endpoints
 class RegisterRequest(BaseModel):
     username: str
     email: str
@@ -47,16 +40,15 @@ class UpdateRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: str
 
+# POST /register endpoint for registering new users
 @app.post('/register')
 async def register_user(request: RegisterRequest):
     try:
-        print(request)
-
+        # checking if the passwords match or not
         if request.password != request.confirmPassword:
-            return {"message": "passwords don't match"}
-        
+            return {"error message": "passwords don't match"}
+        # Adding new user to the database
         user = auth.create_user(email=request.email, password=request.password)
-        print(user)
         doc_ref = db.collection("UserData").document(user.uid)
         
 
@@ -73,6 +65,7 @@ async def register_user(request: RegisterRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+# POST /login endpoint for signing into existing user IDs with custom token
 @app.post('/login')
 async def get_auth_token(request: LoginRequest):
     try:
@@ -89,19 +82,27 @@ async def get_auth_token(request: LoginRequest):
         return {"message": "Sign-in successful",  "token": custom_token, "user": user}
     except Exception as e:
         # Handle authentication error, e.g., wrong password, user not found
-        return {"error": str(e)}
+        return {"error message": str(e)}
     
+# POST /profile/{userId}/{operation}/{token} endpoint for deleting a user or updating username and full name i th efirestore database
 @app.post('/profile/{userId}/{operation}/{token}')
 async def update_data(userId, operation, token, request: UpdateRequest):
+
+    # Matching the tokens in the databse and that is given in the endpoint
     doc_ref = db.collection("UserData").document(userId)
     temp_token = doc_ref.get()
     print(temp_token.to_dict()["token"])
+
+    # If tokens don't match then changes can't be made
     if(temp_token.to_dict()["token"] != token):
-        return {"message": "invalid token"}
+        return {"error message": "invalid token"}
+    
+    # Retrieve is used to completely delete a user from both firestoe database and firebase authentication
     if operation == "retrieve":
         auth.delete_user(userId)
         db.collection('UserData').document(userId).delete()
-        return {"message": "user deleted"}
+        return {"error message": "user deleted"}
+    # Update is to chane username or full name or both
     elif operation == "update":
         try:
             doc_ref = db.collection('UserData').document(userId)
@@ -112,7 +113,8 @@ async def update_data(userId, operation, token, request: UpdateRequest):
             doc_ref.update(field_updates)
             return {"message": userId + " data updated"}
         except:
-            return {"erroe message": "could not get the document from firebase"}
+            return {"error message": "could not get the document from firebase"}
         
+# MAIN 
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=8000)
