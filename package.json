@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "firebase": "^10.5.2",
+    "firebase-admin": "^11.11.0"
+  }
+}
