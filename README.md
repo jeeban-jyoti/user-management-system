@@ -56,6 +56,9 @@ Endpoint: POST /profile/{userId}/{operation}/{token}
 
 ## Installation
 1. Download the Github Repository
+2. Node.js modules
+```npm install firebase-admin```
+3. Python modules ```pip install firebase_admin fastapi uvicorn pydantic```
 2. Go inside the folder and type
 ```bash
 python main.py
